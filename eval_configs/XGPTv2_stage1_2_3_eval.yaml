@@ -1,0 +1,25 @@
+model:
+  arch: minigpt4
+  model_type: pretrain_vicuna0
+  max_txt_len: 160
+  bos_token_id: '###'
+  low_resource: false
+  prompt_template: '###Human: {} ###Assistant: '
+  ckpt: ''
+  lora_r: 64
+  lora_alpha: 16
+  ecg_model: ecg_vit
+  seq_len: 1000
+  patch_size:
+  - 1
+  - 200
+datasets:
+  cc_sbu_align:
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+run:
+  task: ecg_text_pretrain

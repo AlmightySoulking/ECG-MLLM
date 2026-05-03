@@ -1,0 +1,7 @@
+datasets:
+  ecg_dataset:
+    data_type: ecg
+    build_info:
+      vis_root: /path/to/ecg/signals
+      ann_paths:
+        - /path/to/ecg/annotations.json

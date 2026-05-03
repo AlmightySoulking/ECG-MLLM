@@ -1,0 +1,7 @@
+datasets:
+  multitask_conversation:
+    data_type: ecg
+    build_info:
+    
+      vis_root: /mnt/share/mllm_data/original_data/COCO2014/train2014
+      ann_path: /mnt/share/mllm_data/original_data/Multi-taskConversation/multitask_conversation.json

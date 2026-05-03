@@ -1,0 +1,6 @@
+datasets:
+  ocrvqa:
+    data_type: ecg
+    build_info:
+      vis_root: /mnt/share/mllm_data/original_data/OCR-VQA/images
+      ann_path: /mnt/share/mllm_data/original_data/OCR-VQA/dataset.json

@@ -1,0 +1,50 @@
+model:
+  arch: minigpt4
+  model_type: pretrain_vicuna0
+  freeze_ecg: false
+  freeze_phi: true
+  lora_r: 64
+  lora_alpha: 16
+  ecg_model: ecg_vit
+  seq_len: 1000
+  patch_size:
+  - 1
+  - 200
+  ckpt: /home/cmpdil/Iit_profbehra/TinyGPT-ECG/TinyGPT-V-main/minigpt4/output/ecg_gpt_stage1/20260427201/checkpoint_1.pth
+datasets:
+  ecg_dataset:
+    batch_size: 16
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    build_info:
+      vis_root:
+      ann_paths:
+      - /home/cmpdil/Iit_profbehra/TinyGPT-ECG/TinyGPT-V-main/data/stage.json
+run:
+  task: ecg_text_pretrain
+  lr_sched: linear_warmup_cosine_lr
+  init_lr: 5e-5
+  min_lr: 1e-5
+  warmup_lr: 1e-6
+  weight_decay: 0.05
+  max_epoch: 2
+  num_workers: 4
+  warmup_steps: 1000
+  iters_per_epoch: 30000
+  seed: 42
+  output_dir: output/ecg_gpt_stage2
+  amp: true
+  resume_ckpt_path: null
+  evaluate: false
+  train_splits:
+  - train
+  device: cuda
+  world_size: 1
+  dist_url: env://
+  distributed: true
+  wandb_log: true
+  job_name: ecg_gpt_stage2

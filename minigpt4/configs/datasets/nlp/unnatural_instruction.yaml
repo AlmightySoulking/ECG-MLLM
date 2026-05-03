@@ -1,0 +1,5 @@
+datasets:
+  unnatural_instruction:
+    data_type: text
+    build_info:
+      ann_path: /mnt/share/zhengqing/filtered_unnatural_instruction.json

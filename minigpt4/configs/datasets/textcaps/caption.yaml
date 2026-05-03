@@ -1,0 +1,9 @@
+datasets:
+  textcaps_caption:
+    data_type: ecg
+    
+    build_info:
+      vis_root: /mnt/share/mllm_data/original_data/TextCaps/train_images
+      ann_path: /mnt/share/mllm_data/original_data/TextCaps/TextCaps_0.1_train.json
+
+

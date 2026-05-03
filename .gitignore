@@ -1,0 +1,35 @@
+# Ignore all JSON files
+*.json
+
+# Ignore log files and directories
+*.log
+logs/
+
+# Ignore pretrained model weights (common extensions)
+*.pth
+*.bin
+*.ckpt
+*.h5
+*.pb
+*.safetensors
+
+# Ignore output directories (likely containing trained models and logs)
+output/
+minigpt4/output/
+
+# Ignore Python virtual environment
+TinyGPT/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db

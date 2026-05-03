@@ -1,0 +1,239 @@
+model:
+  arch: minigpt_v2
+  model_type: pretrain
+  max_txt_len: 1024
+  end_sym: '###'
+  llama_model: 'Qwen/Qwen2.5-3B'
+  ckpt: ''
+  use_grad_checkpoint: true
+  chat_template: true
+  lora_r: 64
+  lora_alpha: 16
+  seq_len: 1000
+  patch_size:
+  - 1
+  - 200
+  ecg_model: ecg_vit
+datasets:
+  multitask_conversation:
+    batch_size: 2
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 50
+  llava_conversation:
+    batch_size: 2
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 30
+  unnatural_instruction:
+    batch_size: 2
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 10
+  refvg:
+    batch_size: 6
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 40
+  llava_detail:
+    batch_size: 4
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 20
+  llava_reason:
+    batch_size: 4
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 80
+  flickr_grounded_caption:
+    batch_size: 2
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 80
+  flickr_CaptionToPhrase:
+    batch_size: 2
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 80
+  flickr_ObjectToPhrase:
+    batch_size: 2
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 80
+  coco_caption:
+    batch_size: 6
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 10
+  textcaps_caption:
+    batch_size: 6
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 30
+  refcoco:
+    batch_size: 6
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 25
+  refcocop:
+    batch_size: 6
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 25
+  refcocog:
+    batch_size: 6
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 25
+  invrefcoco:
+    batch_size: 6
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 10
+  invrefcocop:
+    batch_size: 6
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 10
+  invrefcocog:
+    batch_size: 6
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 10
+  coco_vqa:
+    batch_size: 6
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 15
+  ok_vqa:
+    batch_size: 6
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 8
+  aok_vqa:
+    batch_size: 6
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 12
+  gqa:
+    batch_size: 6
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 50
+  ocrvqa:
+    batch_size: 6
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+    sample_ratio: 30
+run:
+  task: ecg_text_pretrain
+  lr_sched: linear_warmup_cosine_lr
+  init_lr: 1e-5
+  min_lr: 8e-5
+  warmup_lr: 1e-6
+  weight_decay: 0.05
+  max_epoch: 50
+  num_workers: 6
+  warmup_steps: 1000
+  iters_per_epoch: 1000
+  seed: 42
+  output_dir: /mnt/share/zhengqing/zx/TinyGPT-V
+  amp: true
+  resume_ckpt_path: null
+  evaluate: false
+  train_splits:
+  - train
+  device: cuda
+  world_size: 1
+  dist_url: env://
+  distributed: true
+  wandb_log: true
+  job_name: minigptv2_finetune

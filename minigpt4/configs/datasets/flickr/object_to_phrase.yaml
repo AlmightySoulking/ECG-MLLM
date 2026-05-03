@@ -1,0 +1,6 @@
+datasets:
+  flickr_ObjectToPhrase:
+    data_type: ecg
+    build_info:
+      vis_root: /mnt/share/mllm_data/original_data/FilteredFlickr-30k/flickr30k-images
+      ann_path: /mnt/share/mllm_data/original_data/FilteredFlickr-30k/phrasetobbox.json

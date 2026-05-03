@@ -1,0 +1,5 @@
+datasets:
+  refvg:
+    data_type: ecg
+    build_info:
+      data_dir: /mnt/share/mllm_data/original_data/VisualGenome

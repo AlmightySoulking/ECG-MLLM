@@ -1,0 +1,5 @@
+datasets:
+  cc_sbu_align:
+    data_type: ecg
+    build_info:
+      storage: /mnt/share/zhengqing/InstructionGPT-4/cc_sbu_align

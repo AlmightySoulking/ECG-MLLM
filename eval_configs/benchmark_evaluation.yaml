@@ -1,0 +1,74 @@
+model:
+  arch: minigpt_v2
+  model_type: pretrain
+  max_txt_len: 500
+  bos_token_id: '###'
+  low_resource: false
+  prompt_template: '###Human: {} ###Assistant: '
+  llama_model: Qwen/Qwen2.5-3B
+  ckpt: '/home/cmpdil/Iit_profbehra/TinyGPT-ECG/TinyGPT-V-main/minigpt4/output/ecg_gpt_stage3/20260502094/checkpoint_0.pth'
+  lora_r: 64
+  lora_alpha: 16
+  ecg_model: ecg_vit
+  seq_len: 1000
+  patch_size:
+  - 1
+  - 200
+datasets:
+  cc_sbu_align:
+    ecg_processor:
+      train:
+        name: base_processor
+    text_processor:
+      train:
+        name: blip_caption
+evaluation_datasets:
+  refcoco:
+    eval_file_path: null
+    img_path: null
+    max_new_tokens: 20
+    batch_size: 10
+  refcocog:
+    eval_file_path: null
+    img_path: null
+    max_new_tokens: 20
+    batch_size: 10
+  refcoco+:
+    eval_file_path: null
+    img_path: null
+    max_new_tokens: 20
+    batch_size: 10
+  okvqa:
+    eval_file_path: null
+    img_path: null
+    max_new_tokens: 20
+    batch_size: 10
+  gqa:
+    eval_file_path: null
+    img_path: null
+    max_new_tokens: 20
+    batch_size: 10
+  vizwiz:
+    eval_file_path: null
+    img_path: null
+    max_new_tokens: 20
+    batch_size: 10
+  iconvqa:
+    eval_file_path: null
+    img_path: null
+    max_new_tokens: 20
+    batch_size: 1
+  vsr:
+    eval_file_path: null
+    img_path: null
+    max_new_tokens: 20
+    batch_size: 1
+  hm:
+    eval_file_path: null
+    img_path: null
+    max_new_tokens: 20
+    batch_size: 10
+run:
+  task: ecg_text_pretrain
+  name: minigptv2_evaluation
+  save_path: null

@@ -1,0 +1,5 @@
+nohup: ignoring input
+Traceback (most recent call last):
+  File "/home/cmpdil/Iit_profbehra/TinyGPT-ECG/TinyGPT-V-main/inference.py", line 11, in <module>
+    import torch
+ModuleNotFoundError: No module named 'torch'

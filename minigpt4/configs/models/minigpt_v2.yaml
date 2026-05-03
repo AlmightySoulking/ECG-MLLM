@@ -1,0 +1,32 @@
+model:
+  arch: minigpt_v2
+
+  # ecg encoder
+  ecg_model: "ecg_vit"
+  seq_len: 1000
+  patch_size: [1, 200]
+  freeze_ecg: True
+  use_grad_checkpoint: False
+  q_former_model: ""
+
+  # generation configs
+  prompt: ""
+
+  llama_model: "Qwen/Qwen2.5-3B"
+  lora_r: 64
+  lora_alpha: 16
+  lora_dropout: 0.05
+  lora_target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+
+
+preprocess:
+    ecg_processor:
+        train:
+          name: "base_processor"
+        eval:
+          name: "base_processor"
+    text_processor:
+        train:
+          name: "blip_caption"
+        eval:
+          name: "blip_caption"
