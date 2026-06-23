@@ -5,6 +5,7 @@ import os
 import re
 from collections import Counter
 from pathlib import Path
+from typing import Optional
 
 import requests
 import torch
@@ -144,6 +145,15 @@ def build_parser():
         help="Temperature for the judge model.",
     )
     parser.add_argument(
+        "--judge-style",
+        choices=["paper", "json"],
+        default="paper",
+        help=(
+            "Judging protocol. 'paper' follows the original mimic_multi_evaluate.py "
+            "two-turn scoring flow more closely. 'json' uses a single structured prompt."
+        ),
+    )
+    parser.add_argument(
         "--judge-max-tokens",
         type=int,
         default=512,
@@ -192,6 +202,12 @@ def save_json(payload, path_value):
     ensure_parent_dir(path_value)
     with open(path_value, "w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2, ensure_ascii=False)
+
+
+def normalize_question_key(text):
+    text = (text or "").strip().lower()
+    text = re.sub(r"\s+", " ", text)
+    return text
 
 
 def normalize_text(text):
@@ -469,6 +485,58 @@ def load_report_lookup(csv_path, path_column, report_column):
             lookup[normalize_report_key(row[path_column])] = row[report_column].strip()
     return lookup
 
+
+def build_dataset_reference_maps(dataset_samples):
+    by_question = {}
+    for index, sample in enumerate(dataset_samples):
+        key = normalize_question_key(sample.get("question", ""))
+        if key and key not in by_question:
+            by_question[key] = sample
+        if "id" not in sample:
+            sample["_dataset_index"] = index
+    return by_question
+
+
+def resolve_dataset_sample(prediction_sample, dataset_samples, by_question):
+    sample_id = prediction_sample.get("id")
+    if isinstance(sample_id, str) and sample_id.isdigit():
+        sample_id = int(sample_id)
+
+    if isinstance(sample_id, int) and 0 <= sample_id < len(dataset_samples):
+        return dataset_samples[sample_id]
+
+    question_key = normalize_question_key(prediction_sample.get("question", ""))
+    if question_key:
+        return by_question.get(question_key)
+
+    return None
+
+
+def enrich_prediction_payload(prediction_payload, dataset_json_path):
+    dataset_samples = load_json(dataset_json_path)
+    if isinstance(dataset_samples, dict) and "samples" in dataset_samples:
+        dataset_samples = dataset_samples["samples"]
+    if not isinstance(dataset_samples, list):
+        raise ValueError(f"Dataset JSON '{dataset_json_path}' must contain a list of samples.")
+
+    by_question = build_dataset_reference_maps(dataset_samples)
+    enriched_samples = []
+    for prediction_sample in prediction_payload["samples"]:
+        dataset_sample = resolve_dataset_sample(prediction_sample, dataset_samples, by_question)
+        merged = dict(prediction_sample)
+        if dataset_sample is not None:
+            merged.setdefault("question", dataset_sample.get("question", ""))
+            merged.setdefault("answer", dataset_sample.get("answer", ""))
+            if "ecg_paths" not in merged and "ecg_path" in dataset_sample:
+                ecg_path = dataset_sample.get("ecg_path", [])
+                merged["ecg_paths"] = ecg_path if isinstance(ecg_path, list) else [ecg_path]
+            if "dataset" not in merged and "dataset" in dataset_sample:
+                merged["dataset"] = dataset_sample.get("dataset")
+            merged["dataset_index"] = dataset_sample.get("_dataset_index")
+        enriched_samples.append(merged)
+
+    return {**prediction_payload, "samples": enriched_samples}
+
 class OpenAIJudge:
     def __init__(self, model_name, base_url, api_key, temperature, max_tokens, fallback_model=None):
         self.model_name = model_name
@@ -544,7 +612,7 @@ class OpenAIJudge:
         return data["choices"][0]["message"]["content"]
 
 
-def build_judge_prompt(sample, reports):
+def build_json_judge_prompt(sample, reports):
     report_lines = []
     if reports:
         for index, report in enumerate(reports, start=1):
@@ -573,15 +641,55 @@ def build_judge_prompt(sample, reports):
     return "\n".join(prompt_parts)
 
 
+def build_paper_judge_prompt(sample, reports):
+    if reports:
+        report_text = str(reports)
+    else:
+        report_text = "[]"
+    return (
+        f"For the given question <{sample['question']}> about multiple ECG-QA, and the report "
+        f"{report_text} corresponding to each ECG, score the answer below, where 0 means "
+        f"completely incorrect and 5 means completely correct. The answer is: "
+        f"<{sample['prediction']}>."
+    )
+
+
+def run_paper_style_judge(judge, sample, reports):
+    prompt = build_paper_judge_prompt(sample, reports)
+    messages = [{"role": "user", "content": prompt}]
+    mid_response = judge.chat(messages)
+    final_messages = messages + [
+        {"role": "assistant", "content": mid_response},
+        {"role": "user", "content": "So what is the final score? Just give me a number between 0 and 5."},
+    ]
+    final_response = judge.chat(final_messages)
+    return mid_response, final_response
+
+
+def run_json_style_judge(judge, sample, reports):
+    prompt = build_json_judge_prompt(sample, reports)
+    messages = [{"role": "user", "content": prompt}]
+    response = judge.chat(messages)
+    return None, response
+
+
 def extract_score(raw_response):
     if raw_response is None:
         return None
 
     try:
         parsed = json.loads(raw_response)
-        score = parsed.get("score")
-        if score is not None:
-            return float(score)
+        if isinstance(parsed, dict):
+            score = parsed.get("score")
+            if score is not None:
+                return float(score)
+        elif isinstance(parsed, (int, float)):
+            if 0 <= float(parsed) <= 5:
+                return float(parsed)
+        elif isinstance(parsed, str):
+            stripped = parsed.strip()
+            if re.fullmatch(r"[0-5](?:\.\d+)?", stripped):
+                return float(stripped)
     except json.JSONDecodeError:
         pass
 
@@ -611,13 +719,16 @@ def summarize_judge_results(samples):
         "num_samples": len(samples),
         "num_scored": len(scored),
         "mean_score": sum(scored) / len(scored),
+        "mean_score_pct_of_5": (sum(scored) / len(scored)) / 5 * 100,
         "score_distribution": dict(sorted(rounded_distribution.items())),
     }
 
 
-def load_predictions_for_judging(path_value):
+def load_predictions_for_judging(path_value, dataset_json_path=None):
     payload = load_json(path_value)
     if isinstance(payload, dict) and "samples" in payload:
+        if dataset_json_path:
+            return enrich_prediction_payload(payload, dataset_json_path)
         return payload
     raise ValueError(f"Predictions file '{path_value}' must contain a top-level 'samples' list.")
 
@@ -627,7 +738,10 @@ def run_judging(args, prediction_payload=None):
         raise ValueError("--judge-model is required for '--mode judge' and '--mode all'.")
 
     if prediction_payload is None:
-        prediction_payload = load_predictions_for_judging(args.predictions_path)
+        prediction_payload = load_predictions_for_judging(
+            args.predictions_path,
+            dataset_json_path=args.dataset_json,
+        )
 
     report_lookup = None
     if args.report_csv:
@@ -655,14 +769,17 @@ def run_judging(args, prediction_payload=None):
                 for path in sample.get("ecg_paths", [])
             ]
 
-        prompt = build_judge_prompt(sample, reports)
-        messages = [{"role": "user", "content": prompt}]
-        raw_response = judge.chat(messages)
+        if args.judge_style == "paper":
+            mid_response, raw_response = run_paper_style_judge(judge, sample, reports)
+        else:
+            mid_response, raw_response = run_json_style_judge(judge, sample, reports)
         score = extract_score(raw_response)
         judged_samples.append(
             {
                 **sample,
+                "judge_style": args.judge_style,
                 "judge_score": score,
+                "judge_mid_response": mid_response,
                 "judge_response": raw_response,
                 "reference_reports": reports,
             }

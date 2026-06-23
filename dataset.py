@@ -94,6 +94,14 @@ class FinetuningDataset(Dataset):
         label = sample[self._label_test_].values
         return ecg, label
     
+        # real_ecg_dir = '/home/cmpdil/iit_profbehra2/ecg_data/physionet.org/files/ptb-xl/1.0.3/'
+        # safe_path = str(sample['path']).lstrip('/')
+        # ecg_path = os.path.join(real_ecg_dir, safe_path)        
+        # ecg = get_ecg_from_path(ecg_path, self.sampling_freq)
+        # ecg = self.ecg_transform(ecg)
+        # label = sample[self._label_test_].values
+        # return ecg, label
+    
 class FinetuningCollator:
     def __call__(self, batch):
         ecgs = [item[0] for item in batch]
