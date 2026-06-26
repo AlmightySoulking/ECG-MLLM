@@ -32,7 +32,8 @@ run:
   min_lr: 1e-5
   warmup_lr: 1e-6
   weight_decay: 0.05
-  max_epoch: 2
+  max_epoch: 5
+  early_stop_patience: 2  # stop if train loss does not improve for this many epochs
   num_workers: 4
   warmup_steps: 1000
   iters_per_epoch: 30000

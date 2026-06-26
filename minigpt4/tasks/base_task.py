@@ -232,8 +232,16 @@ class BaseTask:
 
             if torch.isnan(loss) or torch.isinf(loss):
                 logging.warning("Loss is NaN or Inf. Skipping the batch.")
-                optimizer.zero_grad()
+                # Zero grad to avoid bleeding leftover gradients into the next
+                # accumulation window when a step is skipped mid-accumulation.
+                if (i + 1) % accum_grad_iters == 0:
+                    optimizer.zero_grad()
                 continue
+
+            # Normalize loss by accumulation steps so the effective gradient
+            # magnitude matches a single forward pass with the full batch size.
+            raw_loss = loss.item()  # keep un-normalized value for logging
+            loss = loss / accum_grad_iters
 
             # after_train_step()
             if use_amp:
@@ -257,12 +265,12 @@ class BaseTask:
                     wandb.log(
                         {
                             "epoch": inner_epoch,
-                            "loss": loss.item(),
+                            "loss": raw_loss,
                             "lr": optimizer.param_groups[0]["lr"],
                             "iter": global_start_step + i + 1,
                         }
                     )
-            metric_logger.update(loss=loss.item())
+            metric_logger.update(loss=raw_loss)
             metric_logger.update(lr=optimizer.param_groups[0]["lr"])
 
         # after train_epoch()

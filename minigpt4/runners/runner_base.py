@@ -299,6 +299,10 @@ class RunnerBase:
         return int(self.config.run_cfg.get("accum_grad_iters", 1))
 
     @property
+    def early_stop_patience(self):
+        return int(self.config.run_cfg.get("early_stop_patience", 0))  # 0 = disabled
+
+    @property
     def valid_splits(self):
         valid_splits = self.config.run_cfg.get("valid_splits", [])
 
@@ -364,6 +368,12 @@ class RunnerBase:
         best_agg_metric = 0
         best_epoch = 0
 
+        # Early stopping state (train-loss based, used when no val split exists)
+        patience = self.early_stop_patience
+        best_train_loss = float("inf")
+        epochs_without_improvement = 0
+        early_stop_delta = 1e-4  # minimum improvement to reset the patience counter
+
         self.log_config()
 
         # resume from checkpoint if specified
@@ -401,9 +411,33 @@ class RunnerBase:
                             self.log_stats(val_log, split_name)
 
             else:
-                # if no validation split is provided, we just save the checkpoint at the end of each epoch.
+                # No validation split — save checkpoint and apply train-loss early stopping.
                 if not self.evaluate_only:
                     self._save_checkpoint(cur_epoch, is_best=False)
+
+                    if patience > 0 and not self.evaluate_only:
+                        epoch_loss = float(train_stats.get("loss", float("inf")))
+                        if epoch_loss < best_train_loss - early_stop_delta:
+                            best_train_loss = epoch_loss
+                            epochs_without_improvement = 0
+                            logging.info(
+                                "Early stopping: train loss improved to {:.4f} at epoch {}.".format(
+                                    best_train_loss, cur_epoch
+                                )
+                            )
+                        else:
+                            epochs_without_improvement += 1
+                            logging.info(
+                                "Early stopping: no improvement for {}/{} epochs (best loss {:.4f}, current {:.4f}).".format(
+                                    epochs_without_improvement, patience, best_train_loss, epoch_loss
+                                )
+                            )
+                            if epochs_without_improvement >= patience:
+                                logging.info(
+                                    "Early stopping triggered after {} epochs without improvement. "
+                                    "Stopping at epoch {}.".format(patience, cur_epoch)
+                                )
+                                break
 
             if self.evaluate_only:
                 break

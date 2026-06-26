@@ -13,7 +13,7 @@ model:
   pretrained_ecg: "/home/cmpdil/iit_profbehra2/pretrained/vit_base_sigmoid/model_epoch9 copy.bin"
 datasets:
   ecg_dataset:
-    batch_size: 64
+    batch_size: 8
     ecg_processor:
       train:
         name: base_processor
@@ -32,10 +32,12 @@ run:
   min_lr: 8e-5
   warmup_lr: 1e-6
   weight_decay: 0.05
-  max_epoch: 2
+  max_epoch: 5
+  early_stop_patience: 2  # stop if train loss does not improve for this many epochs
   num_workers: 4
   warmup_steps: 1000
-  iters_per_epoch: 5000
+  iters_per_epoch: 3020  # floor(773268 samples / 8 batch_size / 32 accum_grad_iters)
+  accum_grad_iters: 32   # effective batch size = 8 * 32 = 256
   seed: 42
   output_dir: output/ecg_gpt_stage1
   amp: true
