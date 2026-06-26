@@ -5,15 +5,16 @@ model:
   bos_token_id: '###'
   low_resource: false
   prompt_template: '###Human: {} ###Assistant: '
-  llama_model: Qwen/Qwen2.5-3B
+  llama_model: Qwen/Qwen3.5-9B
   ckpt: '/home/cmpdil/Iit_profbehra/TinyGPT-ECG/TinyGPT-V-main/minigpt4/output/ecg_gpt_stage3/20260502094/checkpoint_0.pth'
-  lora_r: 64
+  lora_r: 8
   lora_alpha: 16
   ecg_model: ecg_vit
   seq_len: 1000
   patch_size:
   - 1
   - 200
+  pretrained_ecg: "/home/cmpdil/iit_profbehra2/pretrained/vit_base_sigmoid/model_epoch9 copy.bin"
 datasets:
   cc_sbu_align:
     ecg_processor:
@@ -21,7 +22,7 @@ datasets:
         name: base_processor
     text_processor:
       train:
-        name: blip_caption
+        name: base_processor
 evaluation_datasets:
   refcoco:
     eval_file_path: null

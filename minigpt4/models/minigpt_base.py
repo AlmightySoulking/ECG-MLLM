@@ -28,7 +28,7 @@ class MiniGPTBase(BaseModel):
         end_sym='\n',
         low_resource=False,  # use 8 bit and put vit in cpu
         device_8bit=0,  # the device of 8bit model should be set when loading and cannot be changed anymore.
-        lora_r=0,  # lora_r means lora is not used
+        lora_r=8,
         lora_target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
         lora_alpha=16,
         lora_dropout=0.05,
@@ -64,6 +64,28 @@ class MiniGPTBase(BaseModel):
         self.ln_vision.float()
         self.visual_encoder.to("cpu")
         self.visual_encoder.float()
+
+    def load_ecg_encoder(self, ckpt_path):
+        logging.info("Loading ECG encoder from %s", ckpt_path)
+        print(f"Loading ECG encoder from {ckpt_path}")
+        checkpoint = torch.load(ckpt_path, map_location="cpu")
+        state_dict = checkpoint["model"] if "model" in checkpoint else checkpoint
+
+        new_state_dict = {}
+        prefixes = ["visual_encoder.", "ecg_model.model.", "model."]
+        for k, v in state_dict.items():
+            matched = False
+            for prefix in prefixes:
+                if k.startswith(prefix):
+                    new_state_dict[k[len(prefix):]] = v
+                    matched = True
+                    break
+            if not matched:
+                new_state_dict[k] = v
+
+        msg = self.visual_encoder.load_state_dict(new_state_dict, strict=False)
+        logging.info("ECG encoder load msg: %s", msg)
+        print(f"ECG encoder load msg: {msg}")
 
     def get_bos_token_id(self):
         return (

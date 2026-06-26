@@ -22,7 +22,7 @@ def eval_parser():
     parser.add_argument("--eval_opt", type=str, default='all', help="path to configuration file.")
     parser.add_argument("--max_new_tokens", type=int, default=10, help="max number of generated tokens")
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--lora_r", type=int, default=64, help="lora rank of the model")
+    parser.add_argument("--lora_r", type=int, default=8, help="lora rank of the model")
     parser.add_argument("--lora_alpha", type=int, default=16, help="lora alpha")
     parser.add_argument(
         "--options",

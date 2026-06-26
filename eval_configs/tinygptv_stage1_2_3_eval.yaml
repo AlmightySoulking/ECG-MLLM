@@ -6,13 +6,14 @@ model:
   low_resource: false
   prompt_template: '###Human: {} ###Assistant: '
   ckpt: ''
-  lora_r: 64
+  lora_r: 8
   lora_alpha: 16
   ecg_model: ecg_vit
   seq_len: 1000
   patch_size:
   - 1
   - 200
+  pretrained_ecg: "/home/cmpdil/iit_profbehra2/pretrained/vit_base_sigmoid/model_epoch9 copy.bin"
 datasets:
   cc_sbu_align:
     ecg_processor:
@@ -20,6 +21,6 @@ datasets:
         name: base_processor
     text_processor:
       train:
-        name: blip_caption
+        name: base_processor
 run:
   task: ecg_text_pretrain

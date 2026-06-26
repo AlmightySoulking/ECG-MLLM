@@ -169,7 +169,7 @@ class BaseModel(nn.Module):
         logging.info('Loading ECG VIT Done')
         return visual_encoder, ln_vision
 
-    def init_llm(cls, llama_model_path, low_resource=False, low_res_device=0, lora_r=0,
+    def init_llm(cls, llama_model_path, low_resource=False, low_res_device=0, lora_r=8,
                  lora_target_modules=None, freeze_phi=True, **lora_kargs):
         logging.info("Loading LLM")
 

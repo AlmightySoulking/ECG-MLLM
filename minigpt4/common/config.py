@@ -476,7 +476,7 @@ def create_runner_config_validator():
     validator.add_argument(
         "num_ans_candidates",
         type=int,
-        help="""For ALBEF and BLIP, these models first rank answers according to likelihood to select answer candidates.""",
+        help="""For compatible evaluation models, rank answers according to likelihood to select answer candidates.""",
     )
     # add arguments for inference method
     validator.add_argument(

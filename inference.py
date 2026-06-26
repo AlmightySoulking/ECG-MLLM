@@ -28,7 +28,7 @@ CLASSIFICATION_TABLE_SPECS = [
 
 def build_parser():
     parser = argparse.ArgumentParser(
-        description="Benchmark inference for the ECG-encoder + Qwen2.5-3B model in this repo."
+        description="Benchmark inference for the ECG-encoder + Qwen3.5-9B model in this repo."
     )
     parser.add_argument(
         "--dataset",
