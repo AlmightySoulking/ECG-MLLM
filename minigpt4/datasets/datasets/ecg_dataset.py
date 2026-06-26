@@ -71,20 +71,24 @@ class ECGDataset(BaseDataset):
         return os.path.expanduser(normalized)
 
     @staticmethod
-    def _extract_signal_id(annotation):
-        signal_id = annotation.get("ecg_path", annotation.get("ecg_id", annotation.get("image_path", "")))
-
+    def _extract_signal_ids(annotation):
+        """Return ALL ECG paths for an annotation entry as a list."""
+        signal_id = annotation.get(
+            "ecg_path", annotation.get("ecg_id", annotation.get("image_path", ""))
+        )
         if isinstance(signal_id, list):
-            signal_id = signal_id[0] if signal_id else ""
+            ids = [str(s).strip() for s in signal_id if s]
+        elif signal_id:
+            ids = [str(signal_id).strip()]
+        else:
+            ids = []
+        return [s for s in ids if s and s.lower() != "none"]
 
-        if signal_id is None:
-            return ""
-
-        signal_id = str(signal_id).strip()
-        if signal_id.lower() == "none":
-            return ""
-
-        return signal_id
+    # Keep the old single-value helper for internal use by _resolve_signal_base_paths.
+    @staticmethod
+    def _extract_signal_id(annotation):
+        ids = ECGDataset._extract_signal_ids(annotation)
+        return ids[0] if ids else ""
 
     @staticmethod
     def _extract_dataset_root(annotation):
@@ -194,6 +198,24 @@ class ECGDataset(BaseDataset):
                 deduped_paths.append(normalized_candidate)
 
         return deduped_paths
+
+    def _resolve_signal_base_paths_for_id(self, annotation, signal_id):
+        """Like _resolve_signal_base_paths but accepts an explicit signal_id string."""
+        signal_id = os.path.expanduser(signal_id)
+        if os.path.isabs(signal_id):
+            return [signal_id]
+
+        dataset_root = self._extract_dataset_root(annotation)
+        candidates = self._resolve_dataset_root_candidates(dataset_root)
+        if candidates:
+            return [os.path.normpath(os.path.join(r, signal_id)) for r in candidates]
+
+        paths = []
+        if self.vis_root:
+            paths.append(os.path.join(self.vis_root, signal_id))
+        paths.append(signal_id)
+        paths.extend(os.path.join(r, signal_id) for r in self.annotation_roots)
+        return list(dict.fromkeys(os.path.normpath(p) for p in paths))
 
     @staticmethod
     def _resolve_tensor_path(base_path):
@@ -396,45 +418,65 @@ class ECGDataset(BaseDataset):
         for offset in range(dataset_size):
             ann = self.annotation[(index + offset) % dataset_size]
 
-            # Use various keys for signal path, instruction/question, and answer/output
-            signal_id = self._extract_signal_id(ann)
-            instruction = ann.get("question", ann.get("instruction", "describe this ECG signal."))
-            answer = ann.get("answer", ann.get("output", ""))
-            try:
-                signal_paths = self._resolve_signal_base_paths(ann)
-            except FileNotFoundError:
-                logging.warning("Skipping ECG annotation with no signal path: %s", ann.get("instance_id", index))
-                continue
-
-            ecg_signal = None
-            for signal_path in signal_paths:
-                try:
-                    ecg_signal = self._load_ecg_signal(signal_path)
-                    break
-                except FileNotFoundError:
-                    continue
-
-            if ecg_signal is None:
-                dataset_root = self._extract_dataset_root(ann)
+            signal_ids = self._extract_signal_ids(ann)          # list of N ECG paths
+            if not signal_ids:
                 logging.warning(
-                    "Skipping missing ECG signal '%s' from dataset root '%s'. Tried: %s",
-                    signal_id,
-                    dataset_root,
-                    ", ".join(signal_paths),
+                    "Skipping annotation with no ECG path: %s", ann.get("instance_id", index)
                 )
                 continue
 
-            # Ensure signal is float32 and pass through processor
-            ecg_signal = ecg_signal.float()
-            ecg_signal = self.vis_processor(ecg_signal)
+            instruction = ann.get("question", ann.get("instruction", "describe this ECG signal."))
+            answer      = ann.get("answer",   ann.get("output", ""))
 
-            # Wrap instruction with image placeholder
-            instruction = "<Img><ImageHere></Img> {} ".format(instruction)
+            # Load every ECG in the sample
+            ecg_signals = []
+            skip = False
+            for sid in signal_ids:
+                try:
+                    paths = self._resolve_signal_base_paths_for_id(ann, sid)
+                except FileNotFoundError:
+                    skip = True
+                    break
+                signal = None
+                for path in paths:
+                    try:
+                        signal = self._load_ecg_signal(path).float()
+                        break
+                    except FileNotFoundError:
+                        continue
+                if signal is None:
+                    logging.warning("Could not load ECG '%s' — skipping sample.", sid)
+                    skip = True
+                    break
+                ecg_signals.append(self.vis_processor(signal))
 
-            return {
-                "image": ecg_signal,
-                "answer": answer,
-                "instruction_input": instruction,
-            }
+            if skip:
+                continue
 
-        raise RuntimeError("No valid ECG samples were found in the dataset.")
+            n = len(ecg_signals)
+
+            if n == 1:
+                # ── Single-ECG sample (existing behaviour, unchanged) ──────
+                prompt = "<Img><ImageHere></Img> {} ".format(instruction)
+                return {
+                    "image":             ecg_signals[0],   # (12, T)
+                    "n_ecgs":            1,
+                    "answer":            answer,
+                    "instruction_input": prompt,
+                }
+            else:
+                # ── Multi-ECG sample ────────────────────────────────────────
+                image_stack = torch.stack(ecg_signals, dim=0)   # (N, 12, T)
+                # e.g. "ECG1: <Img><ImageHere></Img> ECG2: <Img><ImageHere></Img> ..."
+                slots  = " ".join(
+                    f"ECG{i+1}: <Img><ImageHere></Img>" for i in range(n)
+                )
+                prompt = "{} {} ".format(slots, instruction)
+                return {
+                    "image":             image_stack,      # (N, 12, T)
+                    "n_ecgs":            n,
+                    "answer":            answer,
+                    "instruction_input": prompt,
+                }
+
+        raise RuntimeError("No valid ECG samples found in the dataset.")

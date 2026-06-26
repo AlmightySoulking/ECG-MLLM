@@ -256,7 +256,25 @@ class MiniGPTBase(BaseModel):
     def preparing_embedding(self, samples):
         ### prepare input tokens
         if 'image' in samples:
-            img_embeds, img_atts = self.encode_img(samples["image"])
+            img_tensor = samples["image"]      # (B, 12, T) or (B, N, 12, T)
+
+            if img_tensor.dim() == 3:
+                # ── Single-ECG (unchanged) ────────────────────────────────────────
+                img_embeds, img_atts = self.encode_img(img_tensor)
+            elif img_tensor.dim() == 4:
+                # ── Multi-ECG: encode each ECG separately, concatenate tokens ──
+                B, N, C, T = img_tensor.shape
+                per_ecg = []
+                for i in range(N):
+                    emb, _ = self.encode_img(img_tensor[:, i])   # (B, Q, D)
+                    per_ecg.append(emb)
+                img_embeds = torch.cat(per_ecg, dim=1)           # (B, N*Q, D)
+                img_atts   = torch.ones(
+                    img_embeds.shape[:2], dtype=torch.long,
+                    device=img_embeds.device
+                )
+            else:
+                raise ValueError(f"Unexpected image dims: {img_tensor.shape}")
         else:
             img_embeds = img_atts = None
 
@@ -375,10 +393,11 @@ class MiniGPTBase(BaseModel):
         do_sample=False,
         stop_words_ids=None,
     ):
-        '''
-            function for generate test use
-        '''
-
+        """
+        images : (B, 12, T)    for single-ECG batches
+               | (B, N, 12, T) for multi-ECG batches
+        texts  : list[str] with the correct number of <ImageHere> placeholders
+        """
         if stop_words_ids is None:
             stop_words_ids = self.get_stop_words_ids()
 
@@ -388,22 +407,40 @@ class MiniGPTBase(BaseModel):
                 [StoppingCriteriaSub(stops=[torch.tensor(stop_words_ids).to(self.device)])]
             )
 
-        img_embeds, atts_img = self.encode_img(images.to(self.device))
-        image_lists = [[image_emb[None]] for image_emb in img_embeds]
+        images = images.to(self.device)
 
-        batch_embs = [self.get_context_emb(text, img_list) for text, img_list in zip(texts, image_lists)]
+        if images.dim() == 3:
+            # Single-ECG
+            img_embeds, _ = self.encode_img(images)          # (B, Q, D)
+            image_lists = [[emb[None]] for emb in img_embeds]
+        elif images.dim() == 4:
+            # Multi-ECG: (B, N, 12, T)
+            B, N, C, T = images.shape
+            per_ecg_embeds = [self.encode_img(images[:, i])[0] for i in range(N)]
+            # image_lists[b] = [ecg1_embed, ecg2_embed, ...]  each (1, Q, D)
+            image_lists = [
+                [per_ecg_embeds[i][b:b+1] for i in range(N)]
+                for b in range(B)
+            ]
+        else:
+            raise ValueError(f"Unexpected image shape: {images.shape}")
+
+        batch_embs = [
+            self.get_context_emb(text, img_list)
+            for text, img_list in zip(texts, image_lists)
+        ]
 
         batch_size = len(batch_embs)
-        max_len = max([emb.shape[1] for emb in batch_embs])
-        emb_dim = batch_embs[0].shape[2]
-        dtype = batch_embs[0].dtype
-        device = batch_embs[0].device
+        max_len    = max(e.shape[1] for e in batch_embs)
+        emb_dim    = batch_embs[0].shape[2]
+        dtype      = batch_embs[0].dtype
+        device     = batch_embs[0].device
 
-        embs = torch.zeros([batch_size, max_len, emb_dim], dtype=dtype, device=device)
-        attn_mask = torch.zeros([batch_size, max_len], dtype=torch.int, device=device)
+        embs      = torch.zeros([batch_size, max_len, emb_dim], dtype=dtype, device=device)
+        attn_mask = torch.zeros([batch_size, max_len], dtype=torch.int,  device=device)
         for i, emb in enumerate(batch_embs):
             emb_len = emb.shape[1]
-            embs[i, -emb_len:] = emb[0]
+            embs[i, -emb_len:]      = emb[0]
             attn_mask[i, -emb_len:] = 1
 
         with self.maybe_autocast():
@@ -429,13 +466,12 @@ class MiniGPTBase(BaseModel):
         for output_token in outputs:
             if bos_token_id is not None and output_token[0] == bos_token_id:
                 output_token = output_token[1:]
-            output_texts = self.llama_tokenizer.decode(output_token, skip_special_tokens=True)
-            output_texts = output_texts.split('###')[0]
-            output_texts = output_texts.replace("<s>", "")
-            output_texts = output_texts.split(r'[/INST]')[-1].strip()
-            output_texts = output_texts.split("Assistant:")[-1].strip()
-            answers.append(output_texts)
-
+            output_text = self.llama_tokenizer.decode(output_token, skip_special_tokens=True)
+            output_text = output_text.split('###')[0]
+            output_text = output_text.replace('<s>', '').replace('</s>', '')
+            output_text = output_text.split(r'[/INST]')[-1].strip()
+            output_text = output_text.split('Assistant:')[-1].strip()
+            answers.append(output_text)
         return answers
 
     @torch.no_grad()
