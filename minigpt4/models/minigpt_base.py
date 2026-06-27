@@ -21,7 +21,7 @@ class MiniGPTBase(BaseModel):
         ecg_model="ecg_vit",
         seq_len=1000,
         patch_size=(1, 200),
-        llama_model="",
+        llama_model="Qwen/Qwen3-8B",
         max_txt_len=32,
         max_context_len=3800,
         prompt_template="",
