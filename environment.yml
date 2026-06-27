@@ -1,4 +1,3 @@
-name: mllm
 channels:
   - defaults
   - https://mirrors.ustc.edu.cn/anaconda/pkgs/main/
