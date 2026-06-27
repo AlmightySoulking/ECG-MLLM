@@ -26,7 +26,7 @@ class MiniGPT4(MiniGPTBase):
             seq_len=1000,
             patch_size=(1, 200),
             freeze_ecg=True,
-            llama_model="",
+            llama_model="Qwen/Qwen3-8B",
             prompt_path="",
             prompt_template="",
             max_txt_len=32,

@@ -13,7 +13,7 @@ model:
   # generation configs
   prompt: ""
 
-  llama_model: "Qwen/Qwen3.5-9B"
+  llama_model: "Qwen/Qwen3-8B"
   lora_r: 8
   lora_alpha: 16
   lora_dropout: 0.05
