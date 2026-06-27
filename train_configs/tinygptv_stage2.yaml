@@ -5,7 +5,7 @@ model:
   freeze_phi: true
   lora_r: 8
   lora_alpha: 16
-  ecg_model: ecg_vit
+  ecg_model: ecg_vit_base
   seq_len: 1000
   patch_size:
   - 1
