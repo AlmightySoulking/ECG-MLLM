@@ -160,44 +160,23 @@ class ECGDataset(BaseDataset):
         if os.path.isabs(signal_id):
             return [signal_id]
 
-        dataset_root = self._extract_dataset_root(annotation)
-        dataset_root_candidates = self._resolve_dataset_root_candidates(dataset_root)
-        if dataset_root_candidates:
-            return [
-                os.path.normpath(os.path.join(dataset_root_candidate, signal_id))
-                for dataset_root_candidate in dataset_root_candidates
-            ]
-
-        if not self._warned_missing_dataset_root:
-            logging.warning(
-                "ECG annotation entries without a `dataset` field are falling back to `vis_root` and annotation "
-                "relative resolution."
-            )
-            self._warned_missing_dataset_root = True
-
-        if self.vis_root is None and not self._warned_missing_vis_root:
-            logging.warning(
-                "ECG dataset `vis_root` is not set; resolving relative ECG paths from the current working "
-                "directory and annotation file locations."
-            )
-            self._warned_missing_vis_root = True
-
         candidate_paths = []
+
+        # Always try vis_root first (the config-specified data directory)
         if self.vis_root is not None:
             candidate_paths.append(os.path.join(self.vis_root, signal_id))
 
+        # Then try dataset root from the annotation's "dataset" field
+        dataset_root = self._extract_dataset_root(annotation)
+        dataset_root_candidates = self._resolve_dataset_root_candidates(dataset_root)
+        for dataset_root_candidate in dataset_root_candidates:
+            candidate_paths.append(os.path.join(dataset_root_candidate, signal_id))
+
+        # Bare relative path and annotation-relative paths as final fallbacks
         candidate_paths.append(signal_id)
         candidate_paths.extend(os.path.join(ann_root, signal_id) for ann_root in self.annotation_roots)
 
-        deduped_paths = []
-        seen_paths = set()
-        for candidate in candidate_paths:
-            normalized_candidate = os.path.normpath(candidate)
-            if normalized_candidate not in seen_paths:
-                seen_paths.add(normalized_candidate)
-                deduped_paths.append(normalized_candidate)
-
-        return deduped_paths
+        return list(dict.fromkeys(os.path.normpath(p) for p in candidate_paths))
 
     def _resolve_signal_base_paths_for_id(self, annotation, signal_id):
         """Like _resolve_signal_base_paths but accepts an explicit signal_id string."""
@@ -205,16 +184,22 @@ class ECGDataset(BaseDataset):
         if os.path.isabs(signal_id):
             return [signal_id]
 
-        dataset_root = self._extract_dataset_root(annotation)
-        candidates = self._resolve_dataset_root_candidates(dataset_root)
-        if candidates:
-            return [os.path.normpath(os.path.join(r, signal_id)) for r in candidates]
-
         paths = []
+
+        # Always try vis_root first (the config-specified data directory)
         if self.vis_root:
             paths.append(os.path.join(self.vis_root, signal_id))
+
+        # Then try dataset root from the annotation's "dataset" field
+        dataset_root = self._extract_dataset_root(annotation)
+        candidates = self._resolve_dataset_root_candidates(dataset_root)
+        for r in candidates:
+            paths.append(os.path.join(r, signal_id))
+
+        # Bare relative path and annotation-relative paths as final fallbacks
         paths.append(signal_id)
         paths.extend(os.path.join(r, signal_id) for r in self.annotation_roots)
+
         return list(dict.fromkeys(os.path.normpath(p) for p in paths))
 
     @staticmethod
